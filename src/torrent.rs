@@ -49,14 +49,14 @@ impl TryFrom<Bencode> for Torrent {
             _ => return Err("Torrent root must be a dict".to_string()),
         };
 
-        let announce = take_string(&mut dict, "announce")?;
+        let announce = take_text(&mut dict, "announce")?;
         let announce_list = match dict.remove("announce-list") {
             Some(Bencode::List(tiers)) => Some(
                 tiers
                     .into_iter()
                     .map(|tier| match tier {
                         Bencode::List(urls) => urls.into_iter().map(|u| match u {
-                            Bencode::String(s) => Ok(s),
+                            Bencode::ByteString(bytes) => Ok(String::from_utf8_lossy(&bytes).into_owned()),
                             _ => Err("announce-list entries must be strings".to_string()),
                         }).collect::<Result<Vec<_>, _>>(),
                         _ => Err("announce-list tiers must be lists".to_string()),
@@ -66,10 +66,10 @@ impl TryFrom<Bencode> for Torrent {
             Some(_) => return Err("announce-list must be a list".to_string()),
             None => None,
         };
-        let comment = take_optional_string(&mut dict, "comment")?;
-        let created_by = take_optional_string(&mut dict, "created by")?;
+        let comment = take_optional_text(&mut dict, "comment")?;
+        let created_by = take_optional_text(&mut dict, "created by")?;
         let creation_date = take_optional_int(&mut dict, "creation date")?;
-        let encoding = take_optional_string(&mut dict, "encoding")?;
+        let encoding = take_optional_text(&mut dict, "encoding")?;
  
         let info_value = dict
             .remove("info")
@@ -97,10 +97,10 @@ impl TryFrom<Bencode> for Info {
             _ => return Err("info must be a dict".to_string()),
         };
  
-        let name = take_string(&mut dict, "name")?;
+        let name = take_text(&mut dict, "name")?;
         let piece_length = take_int(&mut dict, "piece length")?;
         let pieces = match dict.remove("pieces") {
-            Some(Bencode::String(s)) => s.into_bytes(),
+            Some(Bencode::ByteString(bytes)) => bytes,
             _ => return Err("Missing or invalid required key: pieces".to_string()),
         };
         let private = match dict.remove("private") {
@@ -121,7 +121,7 @@ impl TryFrom<Bencode> for Info {
             FileMode::Multi { files }
         } else {
             let length = take_int(&mut dict, "length")?;
-            let md5sum = take_optional_string(&mut dict, "md5sum")?;
+            let md5sum = take_optional_text(&mut dict, "md5sum")?;
             FileMode::Single { length, md5sum }
         };
  
@@ -149,13 +149,13 @@ impl TryFrom<Bencode> for FileEntry {
             Some(Bencode::List(segments)) => segments
                 .into_iter()
                 .map(|seg| match seg {
-                    Bencode::String(s) => Ok(s),
+                    Bencode::ByteString(bytes) => Ok(String::from_utf8_lossy(&bytes).into_owned()),
                     _ => Err("path segments must be strings".to_string()),
                 })
                 .collect::<Result<Vec<_>, _>>()?,
             _ => return Err("Missing or invalid required key: path".to_string()),
         };
-        let md5sum = take_optional_string(&mut dict, "md5sum")?;
+        let md5sum = take_optional_text(&mut dict, "md5sum")?;
  
         Ok(FileEntry {
             length,
@@ -178,12 +178,15 @@ fn take_value<T>(
         .transpose()
 }
 
-fn take_optional_string(dict: &mut BTreeMap<String, Bencode>, key: &str) -> Result<Option<String>, String> {
-    take_value(dict, key, "string", |b| if let Bencode::String(s) = b { Some(s) } else { None })
+fn take_optional_text(dict: &mut BTreeMap<String, Bencode>, key: &str) -> Result<Option<String>, String> {
+    take_value(dict, key, "byte string", |b| match b {
+        Bencode::ByteString(bytes) => Some(String::from_utf8_lossy(&bytes).into_owned()),
+        _ => None,
+    })
 }
 
-fn take_string(dict: &mut BTreeMap<String, Bencode>, key: &str) -> Result<String, String> {
-    take_optional_string(dict, key)?.ok_or_else(|| format!("Missing required key: {key}"))
+fn take_text(dict: &mut BTreeMap<String, Bencode>, key: &str) -> Result<String, String> {
+    take_optional_text(dict, key)?.ok_or_else(|| format!("Missing required key: {key}"))
 }
 
 fn take_optional_int(dict: &mut BTreeMap<String, Bencode>, key: &str) -> Result<Option<i64>, String> {

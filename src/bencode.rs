@@ -5,7 +5,7 @@ pub enum Bencode {
     Dict(BTreeMap<String, Bencode>),
     Integer(i64),
     List(Vec<Bencode>),
-    String(String),
+    ByteString(Vec<u8>),
 }
 
 impl Bencode {
@@ -19,7 +19,7 @@ impl Bencode {
             Some(b'd') => Bencode::parse_dict(bytes),
             Some(b'i') => Bencode::parse_integer(bytes),
             Some(b'l') => Bencode::parse_list(bytes),
-            Some(b'0'..=b'9') => Bencode::parse_string(bytes),
+            Some(b'0'..=b'9') => Bencode::parse_byte_string(bytes),
             Some(_) => Err("Invalid bencode format".to_string()),
             None => Err("Unexpected end of input".to_string()),
         }
@@ -71,7 +71,7 @@ impl Bencode {
         Ok((Bencode::Integer(num), idx))
     }
 
-    fn parse_string(bytes: &[u8]) -> Result<(Bencode, usize), String> {
+    fn parse_byte_string(bytes: &[u8]) -> Result<(Bencode, usize), String> {
         let mut idx = 0;
 
         if bytes.is_empty() || !bytes[0].is_ascii_digit() {
@@ -97,11 +97,10 @@ impl Bencode {
         }
 
         let string_bytes = &bytes[idx..idx + length];
-        let string = String::from_utf8(string_bytes.to_vec())
-            .map_err(|_| "Invalid UTF-8 string".to_string())?;
+        let bytes = string_bytes.to_vec();
         idx += length;
 
-        Ok((Bencode::String(string), idx))
+        Ok((Bencode::ByteString(bytes), idx))
     }
 
     fn parse_list(bytes: &[u8]) -> Result<(Bencode, usize), String> {
@@ -138,12 +137,12 @@ impl Bencode {
 
         while idx < bytes.len() && bytes[idx] != b'e' {
             // Dict keys must always be bencoded strings.
-            let (key_val, key_consumed) = Bencode::parse_string(&bytes[idx..])?;
+            let (key_val, key_consumed) = Bencode::parse_byte_string(&bytes[idx..])?;
             idx += key_consumed;
 
             let key = match key_val {
-                Bencode::String(s) => s,
-                _ => unreachable!("parse_string always returns Bencode::String"),
+                Bencode::ByteString(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+                _ => unreachable!("parse_byte_string always returns Bencode::ByteString"),
             };
 
             // Spec requires keys in sorted, unique order.

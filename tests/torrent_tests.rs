@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 
 fn make_single_file_info() -> BTreeMap<String, Bencode> {
     let mut info = BTreeMap::new();
-    info.insert("name".to_string(), Bencode::String("sample".to_string()));
+    info.insert("name".to_string(), Bencode::ByteString(b"sample".to_vec()));
     info.insert("piece length".to_string(), Bencode::Integer(65536));
-    info.insert("pieces".to_string(), Bencode::String("abc".to_string()));
+    info.insert("pieces".to_string(), Bencode::ByteString(b"abc".to_vec()));
     info.insert("length".to_string(), Bencode::Integer(123));
     info
 }
@@ -16,8 +16,8 @@ fn make_multi_file_info() -> BTreeMap<String, Bencode> {
     let file_entry = Bencode::Dict(BTreeMap::from([
         ("length".to_string(), Bencode::Integer(10)),
         ("path".to_string(), Bencode::List(vec![
-            Bencode::String("dir".to_string()),
-            Bencode::String("file.txt".to_string()),
+            Bencode::ByteString(b"dir".to_vec()),
+            Bencode::ByteString(b"file.txt".to_vec()),
         ])),
     ]));
     info.insert("files".to_string(), Bencode::List(vec![file_entry]));
@@ -29,7 +29,7 @@ fn make_torrent_root(info: BTreeMap<String, Bencode>) -> Bencode {
     let mut root = BTreeMap::new();
     root.insert(
         "announce".to_string(),
-        Bencode::String("http://tracker".to_string()),
+        Bencode::ByteString(b"http://tracker".to_vec()),
     );
     root.insert("info".to_string(), Bencode::Dict(info));
     Bencode::Dict(root)
@@ -73,28 +73,28 @@ fn parses_multi_file_torrent() {
 #[test]
 fn parses_optional_fields_and_announce_list() {
     let mut info = make_single_file_info();
-    info.insert("md5sum".to_string(), Bencode::String("abc123".to_string()));
+    info.insert("md5sum".to_string(), Bencode::ByteString(b"abc123".to_vec()));
     info.insert("private".to_string(), Bencode::Integer(1));
 
     let mut root = BTreeMap::new();
     root.insert(
         "announce".to_string(),
-        Bencode::String("http://tracker".to_string()),
+        Bencode::ByteString(b"http://tracker".to_vec()),
     );
     root.insert(
         "announce-list".to_string(),
         Bencode::List(vec![
             Bencode::List(vec![
-                Bencode::String("http://a".to_string()),
-                Bencode::String("http://b".to_string()),
+                Bencode::ByteString(b"http://a".to_vec()),
+                Bencode::ByteString(b"http://b".to_vec()),
             ]),
-            Bencode::List(vec![Bencode::String("http://c".to_string())]),
+            Bencode::List(vec![Bencode::ByteString(b"http://c".to_vec())]),
         ]),
     );
-    root.insert("comment".to_string(), Bencode::String("hello".to_string()));
-    root.insert("created by".to_string(), Bencode::String("me".to_string()));
+    root.insert("comment".to_string(), Bencode::ByteString(b"hello".to_vec()));
+    root.insert("created by".to_string(), Bencode::ByteString(b"me".to_vec()));
     root.insert("creation date".to_string(), Bencode::Integer(42));
-    root.insert("encoding".to_string(), Bencode::String("UTF-8".to_string()));
+    root.insert("encoding".to_string(), Bencode::ByteString(b"UTF-8".to_vec()));
     root.insert("info".to_string(), Bencode::Dict(info));
 
     let torrent = Torrent::try_from(Bencode::Dict(root)).unwrap();
@@ -132,9 +132,9 @@ fn rejects_invalid_announce_list_shape() {
     let mut root = BTreeMap::new();
     root.insert(
         "announce".to_string(),
-        Bencode::String("http://tracker".to_string()),
+        Bencode::ByteString(b"http://tracker".to_vec()),
     );
-    root.insert("announce-list".to_string(), Bencode::String("bad".to_string()));
+    root.insert("announce-list".to_string(), Bencode::ByteString(b"bad".to_vec()));
     root.insert(
         "info".to_string(),
         Bencode::Dict(make_single_file_info()),
@@ -149,11 +149,11 @@ fn rejects_invalid_announce_list_entry_shape() {
     let mut root = BTreeMap::new();
     root.insert(
         "announce".to_string(),
-        Bencode::String("http://tracker".to_string()),
+        Bencode::ByteString(b"http://tracker".to_vec()),
     );
     root.insert(
         "announce-list".to_string(),
-        Bencode::List(vec![Bencode::String("not-a-tier".to_string())]),
+        Bencode::List(vec![Bencode::ByteString(b"not-a-tier".to_vec())]),
     );
     root.insert(
         "info".to_string(),
@@ -190,8 +190,8 @@ fn rejects_invalid_file_entry_path() {
 #[test]
 fn rejects_missing_required_info_fields() {
     let mut info = BTreeMap::new();
-    info.insert("name".to_string(), Bencode::String("sample".to_string()));
-    info.insert("pieces".to_string(), Bencode::String("abc".to_string()));
+    info.insert("name".to_string(), Bencode::ByteString(b"sample".to_vec()));
+    info.insert("pieces".to_string(), Bencode::ByteString(b"abc".to_vec()));
 
     let err = Torrent::try_from(make_torrent_root(info)).unwrap_err();
     assert_eq!(err, "Missing required key: piece length");
@@ -202,8 +202,8 @@ fn can_convert_file_entry_directly() {
     let entry = Bencode::Dict(BTreeMap::from([
         ("length".to_string(), Bencode::Integer(7)),
         ("path".to_string(), Bencode::List(vec![
-            Bencode::String("a".to_string()),
-            Bencode::String("b".to_string()),
+            Bencode::ByteString(b"a".to_vec()),
+            Bencode::ByteString(b"b".to_vec()),
         ])),
     ]));
 
@@ -216,9 +216,9 @@ fn can_convert_file_entry_directly() {
 #[test]
 fn can_convert_info_directly() {
     let mut info = BTreeMap::new();
-    info.insert("name".to_string(), Bencode::String("sample".to_string()));
+    info.insert("name".to_string(), Bencode::ByteString(b"sample".to_vec()));
     info.insert("piece length".to_string(), Bencode::Integer(64));
-    info.insert("pieces".to_string(), Bencode::String("abc".to_string()));
+    info.insert("pieces".to_string(), Bencode::ByteString(b"abc".to_vec()));
     info.insert("length".to_string(), Bencode::Integer(11));
 
     let parsed = Info::try_from(Bencode::Dict(info)).unwrap();

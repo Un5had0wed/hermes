@@ -15,7 +15,7 @@ fn parses_integer() {
 fn parses_string() {
     assert_eq!(
         Bencode::parse(b"4:spam"),
-        Ok(Bencode::String("spam".to_string()))
+        Ok(Bencode::ByteString(b"spam".to_vec()))
     );
     assert!(Bencode::parse(b"5:spam").is_err());
 }
@@ -25,8 +25,8 @@ fn parses_list() {
     assert_eq!(
         Bencode::parse(b"l4:spam4:eggse"),
         Ok(Bencode::List(vec![
-            Bencode::String("spam".to_string()),
-            Bencode::String("eggs".to_string()),
+            Bencode::ByteString(b"spam".to_vec()),
+            Bencode::ByteString(b"eggs".to_vec()),
         ]))
     );
 }
@@ -34,8 +34,8 @@ fn parses_list() {
 #[test]
 fn parses_dict() {
     let mut expected = BTreeMap::new();
-    expected.insert("cow".to_string(), Bencode::String("moo".to_string()));
-    expected.insert("spam".to_string(), Bencode::String("eggs".to_string()));
+    expected.insert("cow".to_string(), Bencode::ByteString(b"moo".to_vec()));
+    expected.insert("spam".to_string(), Bencode::ByteString(b"eggs".to_vec()));
     assert_eq!(
         Bencode::parse(b"d3:cow3:moo4:spam4:eggse"),
         Ok(Bencode::Dict(expected))
@@ -52,10 +52,10 @@ fn parses_nested() {
     assert_eq!(
         Bencode::parse(b"l4:spaml1:a1:bee"),
         Ok(Bencode::List(vec![
-            Bencode::String("spam".to_string()),
+            Bencode::ByteString(b"spam".to_vec()),
             Bencode::List(vec![
-                Bencode::String("a".to_string()),
-                Bencode::String("b".to_string()),
+                Bencode::ByteString(b"a".to_vec()),
+                Bencode::ByteString(b"b".to_vec()),
             ]),
         ]))
     );
