@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Bencode {
-    Dict(BTreeMap<String, Bencode>),
+    Dict(BTreeMap<Vec<u8>, Bencode>),
     Integer(i64),
     List(Vec<Bencode>),
     ByteString(Vec<u8>),
@@ -11,6 +11,11 @@ pub enum Bencode {
 impl Bencode {
     pub fn parse(bytes: &[u8]) -> Result<Bencode, String> {
         let (value, _consumed) = Bencode::parse_value(bytes)?;
+
+        if _consumed != bytes.len() {
+            return Err("Extra data after valid bencode".to_string());
+        }
+
         Ok(value)
     }
 
@@ -87,6 +92,10 @@ impl Bencode {
             idx += 1;
         }
 
+        if bytes[0] == b'0' && idx > 1 {
+            return Err("Invalid string format: leading zero in length".to_string());
+        }
+
         if bytes.get(idx) != Some(&b':') {
             return Err("Invalid string format: missing ':'".to_string());
         }
@@ -133,29 +142,28 @@ impl Bencode {
         idx += 1;
 
         let mut map = BTreeMap::new();
-        let mut last_key: Option<String> = None;
+        let mut last_key: Option<Vec<u8>> = None;
 
         while idx < bytes.len() && bytes[idx] != b'e' {
-            // Dict keys must always be bencoded strings.
             let (key_val, key_consumed) = Bencode::parse_byte_string(&bytes[idx..])?;
             idx += key_consumed;
 
             let key = match key_val {
-                Bencode::ByteString(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
-                _ => unreachable!("parse_byte_string always returns Bencode::ByteString"),
+                Bencode::ByteString(bytes) => bytes,
+                _ => unreachable!("parse_byte_string always returns ByteString"),
             };
 
-            // Spec requires keys in sorted, unique order.
+            // Keys must be in strictly increasing lexicographical byte order.
             if let Some(ref last) = last_key {
-                if &key <= last {
+                if key <= *last {
                     return Err("Invalid dict format: keys not sorted/unique".to_string());
                 }
             }
-            last_key = Some(key.clone());
 
             let (value, val_consumed) = Bencode::parse_value(&bytes[idx..])?;
             idx += val_consumed;
 
+            last_key = Some(key.clone());
             map.insert(key, value);
         }
 

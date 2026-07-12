@@ -17,7 +17,9 @@ fn parses_string() {
         Bencode::parse(b"4:spam"),
         Ok(Bencode::ByteString(b"spam".to_vec()))
     );
+
     assert!(Bencode::parse(b"5:spam").is_err());
+    assert!(Bencode::parse(b"03:abc").is_err());
 }
 
 #[test]
@@ -34,8 +36,9 @@ fn parses_list() {
 #[test]
 fn parses_dict() {
     let mut expected = BTreeMap::new();
-    expected.insert("cow".to_string(), Bencode::ByteString(b"moo".to_vec()));
-    expected.insert("spam".to_string(), Bencode::ByteString(b"eggs".to_vec()));
+    expected.insert(b"cow".to_vec(), Bencode::ByteString(b"moo".to_vec()));
+    expected.insert(b"spam".to_vec(), Bencode::ByteString(b"eggs".to_vec()));
+
     assert_eq!(
         Bencode::parse(b"d3:cow3:moo4:spam4:eggse"),
         Ok(Bencode::Dict(expected))
@@ -58,5 +61,31 @@ fn parses_nested() {
                 Bencode::ByteString(b"b".to_vec()),
             ]),
         ]))
+    );
+}
+
+#[test]
+fn rejects_trailing_data() {
+    assert!(Bencode::parse(b"i42ejunk").is_err());
+}
+
+#[test]
+fn parses_empty_values() {
+    assert_eq!(Bencode::parse(b"0:"), Ok(Bencode::ByteString(vec![])));
+    assert_eq!(Bencode::parse(b"le"), Ok(Bencode::List(vec![])));
+    assert_eq!(
+        Bencode::parse(b"de"),
+        Ok(Bencode::Dict(BTreeMap::new()))
+    );
+}
+
+#[test]
+fn parses_non_utf8_dict_key() {
+    let mut expected = BTreeMap::new();
+    expected.insert(vec![0xff], Bencode::Integer(1));
+
+    assert_eq!(
+        Bencode::parse(b"d1:\xffi1ee"),
+        Ok(Bencode::Dict(expected))
     );
 }
