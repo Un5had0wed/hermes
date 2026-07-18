@@ -1,5 +1,6 @@
 mod parser;
 mod encoder;
+mod display;
 
 use std::collections::BTreeMap;
 
