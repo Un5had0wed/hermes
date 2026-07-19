@@ -1,9 +1,7 @@
-// 
-
 use std::env;
 use std::process;
-
-use hermes::torrent::Torrent;
+use std::fs;
+use hermes::bencode::Bencode;
 
 fn main() {
     let path = match env::args().nth(1) {
@@ -14,11 +12,18 @@ fn main() {
         }
     };
 
-    match Torrent::load_file(&path) {
-        Ok(torrent) => println!("{:#?}", torrent.metainfo),
-        Err(e) => {
-            eprintln!("failed to load torrent: {e}");
-            process::exit(1);
-        }
+    let bytes = fs::read(path).map_err(|e| format!("failed to read file: {e}"));
+    if let Err(e) = bytes {
+        eprintln!("{e}");
+        process::exit(1);
     }
+
+    let value = Bencode::parse(&bytes.unwrap());
+    if let Err(e) = value {
+        eprintln!("failed to parse bencode: {e}");
+        process::exit(1);
+    } 
+
+    let value = value.unwrap();
+    print!("{value}");
 }
