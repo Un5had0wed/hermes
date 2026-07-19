@@ -1,16 +1,6 @@
 use crate::bencode::Bencode;
 use super::helpers::{get, expect_u64, expect_string, expect_list, expect_dict, expect_bytes};
 
-use sha1::{Digest, Sha1};
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MetaInfo {
-    pub announce: Option<String>,
-    pub announce_list: Option<Vec<Vec<String>>>,
-    pub info: Info,
-    pub info_hash: [u8; 20],
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Info {
     pub name: String,
@@ -33,43 +23,6 @@ pub struct FileEntry {
     pub length: u64,
     pub path: Vec<String>,
     pub md5sum: Option<String>,
-}
-
-impl TryFrom<&Bencode> for MetaInfo {
-    type Error = String;
-
-    fn try_from(value: &Bencode) -> Result<Self, String> {
-        let dict = expect_dict(value, "torrent")?;
-
-        let announce = get(dict, b"announce")
-            .map(|b| expect_string(b, "announce"))
-            .transpose()?;
-
-        let announce_list = match get(dict, b"announce-list") {
-            Some(b) => {
-                let tiers = expect_list(b, "announce-list")?;
-                let mut result = Vec::with_capacity(tiers.len());
-                for (i, tier) in tiers.iter().enumerate() {
-                    let urls = expect_list(tier, "announce-list tier")?
-                        .iter()
-                        .map(|u| expect_string(u, "announce-list url"))
-                        .collect::<Result<Vec<_>, _>>()
-                        .map_err(|e| format!("announce-list[{i}]: {e}"))?;
-                    result.push(urls);
-                }
-                Some(result)
-            }
-            None => None,
-        };
-
-        let info_value = get(dict, b"info").ok_or("missing 'info' dict")?;
-        let info = Info::try_from(info_value)?;
-
-        let info_bytes = info_value.encode();
-        let info_hash: [u8; 20] = Sha1::digest(&info_bytes).into();
-
-        Ok(MetaInfo { announce, announce_list, info, info_hash })
-    }
 }
 
 impl TryFrom<&Bencode> for Info {

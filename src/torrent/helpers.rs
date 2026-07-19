@@ -1,6 +1,8 @@
 use crate::bencode::Bencode;
 
 use std::collections::BTreeMap;
+use rand::{random_range};
+use std::net::TcpListener;
 
 pub(super) fn get<'a>(m: &'a BTreeMap<Vec<u8>, Bencode>, key: &[u8]) -> Option<&'a Bencode> {
     m.get(key)
@@ -43,4 +45,42 @@ pub(super) fn expect_dict<'a>(b: &'a Bencode, field: &str) -> Result<&'a BTreeMa
         Bencode::Dict(d) => Ok(d),
         _ => Err(format!("'{field}' expected a dictionary")),
     }
+}
+
+pub(super) fn generate_peer_id() -> [u8; 20] {
+    let mut peer_id = [0u8; 20];
+    
+    // 1. Establish the custom prefix for Hermes
+    let prefix = b"-HM0001-";
+    peer_id[..8].copy_from_slice(prefix);
+    
+    // 2. Define the character pool
+    let charset = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    
+    // 3. Fill the remaining 12 bytes using rand
+    for i in 8..20 {
+        let idx = random_range(0..charset.len());
+        peer_id[i] = charset[idx];
+    }
+    
+    peer_id
+}
+
+pub(super) fn get_port() -> Result<u16, String> {
+    // 6881-6889 based on BitTorrent protocol specification 
+    let mut port = 6881;
+
+    while port <= 6889 && is_port_available(port) == false {
+        port += 1;
+    }
+
+    if port > 6889 {
+        return Err("No available port found in the range 6881-6889".to_string());
+    }
+
+    Ok(port)
+}
+
+fn is_port_available(port: u16) -> bool {
+    TcpListener::bind(("127.0.0.1", port)).is_ok()
 }
