@@ -1,5 +1,4 @@
 use crate::bencode::Bencode;
-use super::helpers::{get, expect_u64, expect_string, expect_list, expect_dict, expect_bytes};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Info {
@@ -29,28 +28,29 @@ impl TryFrom<&Bencode> for Info {
     type Error = String;
 
     fn try_from(value: &Bencode) -> Result<Self, String> {
-        let dict = expect_dict(value, "info")?;
+        let dict = value.as_dict("info")?;
 
-        let name = expect_string(
-            get(dict, b"name").ok_or("info.name missing")?,
-            "info.name",
-        )?;
+        let name = dict
+            .get(b"name".as_slice())
+            .ok_or("info.name missing")?
+            .as_string("info.name")?;
 
-        let piece_length = expect_u64(
-            get(dict, b"piece length").ok_or("info.piece length missing")?,
-            "info.piece length",
-        )?;
+        let piece_length = dict
+            .get(b"piece length".as_slice())
+            .ok_or("info.piece length missing")?
+            .as_u64("info.piece length")?;
         if piece_length == 0 {
             return Err("info.piece length must be positive".to_string());
         }
 
-        let raw_pieces = expect_bytes(
-            get(dict, b"pieces").ok_or("info.pieces missing")?,
-            "info.pieces",
-        )?;
+        let raw_pieces = dict
+            .get(b"pieces".as_slice())
+            .ok_or("info.pieces missing")?
+            .as_bytes("info.pieces")?;
         if raw_pieces.len() % 20 != 0 {
             return Err("info.pieces length is not a multiple of 20".to_string());
         }
+
         let pieces = raw_pieces
             .chunks_exact(20)
             .map(|c| {
@@ -60,22 +60,24 @@ impl TryFrom<&Bencode> for Info {
             })
             .collect();
 
-        let private = match get(dict, b"private") {
-            Some(b) => expect_u64(b, "info.private")? != 0,
+        let private = match dict.get(b"private".as_slice()) {
+            Some(b) => b.as_u64("info.private")? != 0,
             None => false,
         };
 
-        let length = get(dict, b"length")
-            .map(|b| expect_u64(b, "info.length"))
+        let length = dict
+            .get(b"length".as_slice())
+            .map(|b| b.as_u64("info.length"))
             .transpose()?;
 
-        let md5sum = get(dict, b"md5sum")
-            .map(|b| expect_string(b, "info.md5sum"))
+        let md5sum = dict
+            .get(b"md5sum".as_slice())
+            .map(|b| b.as_string("info.md5sum"))
             .transpose()?;
 
-        let files = match get(dict, b"files") {
+        let files = match dict.get(b"files".as_slice()) {
             Some(b) => {
-                let files_list = expect_list(b, "info.files")?;
+                let files_list = b.as_list("info.files")?;
                 let parsed = files_list
                     .iter()
                     .enumerate()
@@ -87,6 +89,7 @@ impl TryFrom<&Bencode> for Info {
             }
             None => None,
         };
+
 
         // Enforce mutual exclusivity here, since the flat struct can't.
         match (&length, &files) {
@@ -103,27 +106,30 @@ impl TryFrom<&Bencode> for FileEntry {
     type Error = String;
 
     fn try_from(value: &Bencode) -> Result<Self, String> {
-        let dict = expect_dict(value, "files[]")?;
+        let dict = value.as_dict("files[]")?;
 
-        let length = expect_u64(
-            get(dict, b"length").ok_or("files[].length missing")?,
-            "files[].length",
-        )?;
+        let length = dict
+            .get(b"length".as_slice())
+            .ok_or("files[].length missing")?
+            .as_u64("files[].length")?;
 
-        let path_list = expect_list(
-            get(dict, b"path").ok_or("files[].path missing")?,
-            "files[].path",
-        )?;
+        let path_list = dict
+            .get(b"path".as_slice())
+            .ok_or("files[].path missing")?
+            .as_list("files[].path")?;
+
         if path_list.is_empty() {
             return Err("files[].path must not be empty".to_string());
         }
+        
         let path = path_list
             .iter()
-            .map(|p| expect_string(p, "files[].path segment"))
+            .map(|p| p.as_string("files[].path segment"))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let md5sum = get(dict, b"md5sum")
-            .map(|b| expect_string(b, "files[].md5sum"))
+        let md5sum = dict
+            .get(b"md5sum".as_slice())
+            .map(|b| b.as_string("files[].md5sum"))
             .transpose()?;
 
         Ok(FileEntry { length, path, md5sum })

@@ -1,6 +1,7 @@
-mod parser;
-mod encoder;
+mod access;
 mod display;
+mod encoder;
+mod parser;
 
 use std::collections::BTreeMap;
 
